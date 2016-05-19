@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">RefreshRecyclerView</string>
+
+    <string name="zrc_pull_to_refresh">向下拉，没钱也任性</string>
+    <string name="zrc_release_to_refresh">松手吧，且行且珍惜</string>
+    <string name="zrc_refreshing">真的蛮拼的，甭急</string>
+    <string name="zrc_refresh_success">萌萌哒，刷新成功</string>
+    <string name="zrc_refresh_fail">我也是醉了，刷新失败</string>
+
+</resources>
