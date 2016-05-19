@@ -10,6 +10,7 @@ import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -112,8 +113,8 @@ public class RefreshRecyclerView extends RecyclerView {
     private Runnable mResetHeaderRunnable = new Runnable() {
         @Override
         public void run() {
-            updateViewParams();
             mShowHeader = false;
+            updateViewParams();
             final RefreshEdge headerEdge = mHeaderEdge;
             final int childCount = getChildCount();
             final int firstTop = childCount == 0
@@ -150,44 +151,25 @@ public class RefreshRecyclerView extends RecyclerView {
     private Runnable mResetFooterRunnable = new Runnable() {
         @Override
         public void run() {
-            updateViewParams();
             mShowFooter = false;
+            updateViewParams();
             final RefreshEdge footerEdge = mFooterEdge;
-            if (mFlingRunnable != null && mTouchMode != TOUCH_MODE_SCROLL) {
-                boolean hasScroll = mFlingRunnable.scrollToAdjustViewsUpOrDown();
-                if (!hasScroll) {
-                    footerEdge.onStateChanged(RefreshEdge.STATE_REST);
-                }
-            }
-
             final int childCount = getChildCount();
             final int lastBottom = mLastBottom;
             final int itemCount = mItemCount;
             final int firstTop = mFirstTop;
             final int height = getHeight();
-            final int lastPosition = mLastPosition;
+            final int firstPosition = mFirstPosition;
             final boolean isTooShort = childCount == itemCount && lastBottom - firstTop < height;
             final int bottomOffset = isTooShort ? firstTop : lastBottom - height;
-            final boolean isOutOfBottom = !isTooShort && lastPosition == itemCount -1;
-            int state = footerEdge.getState();
-            if (bottomOffset == 0
-                    && state == RefreshEdge.STATE_REST && mTouchMode == TOUCH_MODE_REST) {
-                if (mFlingRunnable != null) {
-                    mFlingRunnable.scrollToAdjustViewsUpOrDown();
+            final boolean isOutOfBottom = !isTooShort && firstPosition + childCount == mItemCount && bottomOffset < 0;
+            if (isOutOfBottom) {
+                if (mFlingRunnable == null) {
+                    mFlingRunnable = new FlingRunnable();
                 }
-            } else if (bottomOffset < 0
-                    && state == RefreshEdge.STATE_PULL && mTouchMode == TOUCH_MODE_RESCROLL) {
-                if (mFlingRunnable != null) {
-                    mFlingRunnable.scrollToAdjustViewsUpOrDown();
-                    footerEdge.onStateChanged(RefreshEdge.STATE_REST);
-                }
-            } else if (isOutOfBottom
-                    && (state == RefreshEdge.STATE_SUCCESS || state == RefreshEdge.STATE_FAIL)) {
-                if (mFlingRunnable != null && mTouchMode != TOUCH_MODE_SCROLL) {
-                    mFlingRunnable.scrollToAdjustViewsUpOrDown();
-                    footerEdge.onStateChanged(RefreshEdge.STATE_REST);
-                }
+                mFlingRunnable.scrollToAdjustViewsUpOrDown();
             }
+            footerEdge.onStateChanged(RefreshEdge.STATE_REST);
             if (getAdapter() != null) {
                 getAdapter().notifyDataSetChanged();
             }
@@ -331,6 +313,7 @@ public class RefreshRecyclerView extends RecyclerView {
         final RefreshEdge footerEdge = mFooterEdge;
         if (footerEdge != null && footerEdge.getState() == RefreshEdge.STATE_LOADING) {
             footerEdge.onStateChanged(state);
+            Log.i("foot_state", "8 - RefreshEdge.STATE_SUCCESS");
             removeCallbacks(mResetFooterRunnable);
             postDelayed(mResetFooterRunnable, 300);
         }
@@ -858,6 +841,7 @@ public class RefreshRecyclerView extends RecyclerView {
                     switch (state) {
                         case RefreshEdge.STATE_PULL:
                             footerEdge.onStateChanged(RefreshEdge.STATE_RELEASE);
+                            Log.i("foot_state", "4 - RefreshEdge.STATE_RELEASE");
                             break;
                     }
                 } else {
@@ -865,6 +849,7 @@ public class RefreshRecyclerView extends RecyclerView {
                         case RefreshEdge.STATE_REST:
                         case RefreshEdge.STATE_RELEASE:
                             footerEdge.onStateChanged(RefreshEdge.STATE_PULL);
+                            Log.i("foot_state", "5 - RefreshEdge.STATE_PULL");
                             break;
                     }
                 }
@@ -901,6 +886,7 @@ public class RefreshRecyclerView extends RecyclerView {
             }
             if (footerEdge != null && footerEdge.getState() == RefreshEdge.STATE_PULL) {
                 footerEdge.onStateChanged(RefreshEdge.STATE_REST);
+                Log.i("foot_state", "6 - RefreshEdge.STATE_REST");
             }
         }
         mBlockLayoutRequests = true;
@@ -1038,6 +1024,7 @@ public class RefreshRecyclerView extends RecyclerView {
                         }
                         if (!isOnLoading && (state == RefreshEdge.STATE_RELEASE || state == RefreshEdge.STATE_REST)) {
                             footerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
+                            Log.i("foot_state", "7 - RefreshEdge.STATE_LOADING");
 
                             removeCallbacks(mLoadMoreRunnable);
                             postDelayed(mLoadMoreRunnable, (long) Math.abs(distance / mDensity) + 300);
@@ -1048,6 +1035,7 @@ public class RefreshRecyclerView extends RecyclerView {
                         } else if (state == RefreshEdge.STATE_RELEASE) {
                             distance += footerEdge.getHeight();
                             footerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
+                            Log.i("foot_state", "8 - RefreshEdge.STATE_LOADING");
 
                             removeCallbacks(mLoadMoreRunnable);
                             postDelayed(mLoadMoreRunnable, (long) Math.abs(distance / mDensity) + 300);
