@@ -12,6 +12,7 @@ import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
@@ -828,9 +829,17 @@ public class RefreshRecyclerView extends RecyclerView {
             if (isOutOfBottom && footerEdge != null) {
                 incrementalDeltaY /= DRAG_RATE;
                 final int state = footerEdge.getState();
+
+                Log.i("is_always_execute",
+                        "isOutOfBottom: " + isOutOfBottom
+                        + " offset: " + (bottomOffset <= -footerEdge.getHeight())
+                        + " curState: " + state);
+
                 if (bottomOffset <= -footerEdge.getHeight()) {
                     switch (state) {
                         case RefreshEdge.STATE_PULL:
+                        case RefreshEdge.STATE_SUCCESS:
+                        case RefreshEdge.STATE_FAIL:
                             footerEdge.onStateChanged(RefreshEdge.STATE_RELEASE);
                             break;
                     }
@@ -838,6 +847,8 @@ public class RefreshRecyclerView extends RecyclerView {
                     switch (state) {
                         case RefreshEdge.STATE_REST:
                         case RefreshEdge.STATE_RELEASE:
+                        case RefreshEdge.STATE_SUCCESS:
+                        case RefreshEdge.STATE_FAIL:
                             footerEdge.onStateChanged(RefreshEdge.STATE_PULL);
                             break;
                     }
@@ -878,7 +889,6 @@ public class RefreshRecyclerView extends RecyclerView {
             }
         }
         mBlockLayoutRequests = true;
-        updateViewParams();
         offsetChildrenTopAndBottom(incrementalDeltaY);
         updateViewParams();
         invalidate();
@@ -907,18 +917,9 @@ public class RefreshRecyclerView extends RecyclerView {
         private Scroller mScroller;
         private int mLastFlingY;
 
-        private Runnable mLoadMoreRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (mTouchMode == TOUCH_MODE_SCROLL) {
-                    post(mResetFooterRunnable);
-                } else if (!mRefreshing && mAllowLoadMore && mLoadMoreListener != null) {
-                    mShowFooter = true;
-                    mLoadMoreListener.onLoadMore();
-                }
-            }
-        };
-
+        /**
+         * FlingRunnable
+         */
         private FlingRunnable() {
             mScroller = new Scroller(getContext(), new Interpolator() {
                 @Override
@@ -985,7 +986,9 @@ public class RefreshRecyclerView extends RecyclerView {
             final boolean isTooShort = childCount == mItemCount && lastBottom - firstTop < height;
             final int bottomOffset = isTooShort ? firstTop : lastBottom - height;
             final boolean cannotScrollDown = firstPosition == 0 && topOffset > 0;
-            final boolean cannotScrollUp = (lastPosition == -1 || lastPosition == itemCount - 1) && bottomOffset <= 0;
+            final boolean cannotScrollUp = (lastPosition == -1 || lastPosition == itemCount - 1)
+                    && bottomOffset <= 0;
+
             if (cannotScrollDown) {
                 int duration = -firstTop;
                 if (headerEdge != null && mAllowRefresh && mRefreshListener != null
@@ -1003,39 +1006,19 @@ public class RefreshRecyclerView extends RecyclerView {
                 startScroll(-duration, (int) Math.abs(duration / mDensity) + 50);
                 mTouchMode = TOUCH_MODE_RESCROLL;
             } else if (cannotScrollUp) {
-                int distance = bottomOffset;
-                if (mAllowLoadMore && footerEdge != null
-                        && mLoadMoreListener != null && !isTooShort) {
-                    final int state = footerEdge.getState();
-                    if (mAutoLoadMore) {
-                        if (!(mTouchMode == TOUCH_MODE_SCROLL && state == RefreshEdge.STATE_PULL)) {
-                            distance += footerEdge.getHeight();
-                        }
-                        if (!isOnLoading && (state == RefreshEdge.STATE_RELEASE || state == RefreshEdge.STATE_REST)) {
-                            footerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
-
-                            removeCallbacks(mLoadMoreRunnable);
-                            postDelayed(mLoadMoreRunnable, (long) Math.abs(distance / mDensity) + 300);
-                        }
-                    } else {
-                        if (isOnLoading) {
-                            distance += footerEdge.getHeight();
-                        } else if (state == RefreshEdge.STATE_RELEASE) {
-                            distance += footerEdge.getHeight();
-                            footerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
-
-                            removeCallbacks(mLoadMoreRunnable);
-                            postDelayed(mLoadMoreRunnable, (long) Math.abs(distance / mDensity) + 300);
-                        }
+                int duration = bottomOffset;
+                if (mAllowLoadMore && footerEdge != null && mLoadMoreListener != null && !isTooShort) {
+                    if (!isOnLoading &&
+                            (mAutoLoadMore || footerEdge.getState() == RefreshEdge.STATE_RELEASE)) {
+                        mShowFooter = true;
+                        footerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
+                        mLoadMoreListener.onLoadMore();
                     }
+                    duration += footerEdge.getHeight();
+                } else if (footerEdge != null && mShowFooter) {
+                    duration += footerEdge.getHeight();
                 }
-                if (footerEdge != null && mTouchMode == TOUCH_MODE_RESCROLL
-                        && (footerEdge.getState() == RefreshEdge.STATE_SUCCESS
-                        || footerEdge.getState() == RefreshEdge.STATE_FAIL)) {
-                    distance = bottomOffset;
-                }
-                long duration = (long) Math.abs(distance / mDensity) + 50;
-                startScroll(distance, (int) duration);
+                startScroll(duration, (int) Math.abs(duration / mDensity) + 50);
                 mTouchMode = TOUCH_MODE_RESCROLL;
             } else {
                 return false;

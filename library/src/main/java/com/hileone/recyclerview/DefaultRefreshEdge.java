@@ -22,7 +22,6 @@ public class DefaultRefreshEdge implements RefreshEdge {
     private final boolean mIsHeaderEdge;
     private final Paint mTextPaint;
     private Paint mBackgroundPaint;
-    private float mFontOffset;
     private float mPointRadius = 0;
     private float mCircleRadius = 0;
     private int mTime = 0;
@@ -63,7 +62,6 @@ public class DefaultRefreshEdge implements RefreshEdge {
         mBackgroundPaint.setStyle(Paint.Style.FILL);
         mBackgroundPaint.setColor(0xFFDDDDDD);
 
-        mFontOffset = -(mTextPaint.getFontMetrics().top + mTextPaint.getFontMetrics().bottom) / 2;
         mPointRadius = TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP, 2.5f, context.getResources().getDisplayMetrics());
         mCircleRadius = mPointRadius * 3.5f;
@@ -86,18 +84,18 @@ public class DefaultRefreshEdge implements RefreshEdge {
         final int width = right - left;
         final int height = mHeight;
         final int offset = bottom - top;
-        float y;
-        if (offset < height) {
-            y = offset - height / 2;
-        } else {
-            y = offset / 2;
+        int center = Math.max(bottom - top, 0) / 2;
+        if (!mIsHeaderEdge) {
+            center += top;
         }
 
         String showText = "";
         canvas.save();
         canvas.drawRect(left, top, right, bottom, mBackgroundPaint);
+
         switch (mCurrentState) {
             case STATE_REST:
+                break;
             case STATE_PULL:
                 showText = mIsHeaderEdge ? mStatePullText : mStateLoadText;
                 break;
@@ -129,7 +127,7 @@ public class DefaultRefreshEdge implements RefreshEdge {
                 break;
         }
         if (!TextUtils.isEmpty(showText)) {
-            canvas.drawText(showText, width / 2, y + top + mFontOffset, mTextPaint);
+            canvas.drawText(showText, width / 2, center, mTextPaint);
         }
         canvas.restore();
         return more;
