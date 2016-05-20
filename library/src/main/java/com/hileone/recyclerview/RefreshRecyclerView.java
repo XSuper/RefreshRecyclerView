@@ -878,11 +878,10 @@ public class RefreshRecyclerView extends RecyclerView {
             }
         }
         mBlockLayoutRequests = true;
-        invalidate();
         updateViewParams();
-
         offsetChildrenTopAndBottom(incrementalDeltaY);
         updateViewParams();
+        invalidate();
         mBlockLayoutRequests = false;
         return false;
     }
@@ -957,6 +956,7 @@ public class RefreshRecyclerView extends RecyclerView {
             mTouchMode = TOUCH_MODE_REST;
             removeCallbacks(this);
             mScroller.abortAnimation();
+            mNotifyDataChanged = false;
 
             if (oldTouchMode == TOUCH_MODE_FLING
                     || (mHeaderEdge != null && oldTouchMode == TOUCH_MODE_RESCROLL
@@ -1069,19 +1069,15 @@ public class RefreshRecyclerView extends RecyclerView {
                     updateViewParams();
                     final int firstTop = mFirstTop;
                     if (mNotifyDataChanged && firstTop == 0 && delta < 0) {
+                        mNotifyDataChanged = false;
                         offsetChildrenTopAndBottom(0);
                         invalidate();
-                        mNotifyDataChanged = false;
                         endFling();
                         break;
                     }
 
-                    boolean atEnd;
-                    if (delta == 0) {
-                        atEnd = true;
-                    } else {
-                        atEnd = trackMotionScroll(delta);
-                    }
+                    final boolean atEdge = trackMotionScroll(delta);
+                    final boolean atEnd = atEdge && delta != 0;
                     if (atEnd) {
                         endFling();
                         break;
