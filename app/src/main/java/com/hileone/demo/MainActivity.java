@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity
 
         public void initData(){
             data.clear();
-            for(int i = 0; i < 60; i++){
+            for(int i = 0; i < 1; i++){
                 data.add(r.nextInt(100) + "");
             }
             notifyDataSetChanged();
