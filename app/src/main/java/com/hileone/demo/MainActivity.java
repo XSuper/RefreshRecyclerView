@@ -25,9 +25,6 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        DisplayUtils.init(this);
-
         recyclerView = new RefreshRecyclerView(this);
         setContentView(recyclerView);
         recyclerView.setRefreshListener(this);
@@ -89,6 +86,7 @@ public class MainActivity extends AppCompatActivity
         @Override
         public void onBindViewHolder(DemoViewHolder holder, int position) {
             holder.setText("Item" + position + "_" + data.get(position));
+            holder.setOnClick();
         }
 
         @Override

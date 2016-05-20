@@ -1,8 +1,10 @@
 package com.hileone.recyclerview;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.view.MotionEventCompat;
@@ -10,7 +12,7 @@ import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
-import android.util.Log;
+import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -50,7 +52,7 @@ public class RefreshRecyclerView extends RecyclerView {
     private int mItemCount = 0;
     private int mLastBottom = 0;
     private int mLastPosition = 0;
-    private boolean mAutoLoadMore = true;
+    private boolean mAutoLoadMore;
 
     private int mTouchSlop;
     protected float mDensity = 0;
@@ -69,6 +71,7 @@ public class RefreshRecyclerView extends RecyclerView {
     private int mMotionCorrection;
     private Rect mTouchFrame;
     private boolean mBlockLayoutRequests;
+    private boolean mNotifyDataChanged;
 
     private OnRefreshListener mRefreshListener;
     private OnLoadMoreListener mLoadMoreListener;
@@ -96,52 +99,24 @@ public class RefreshRecyclerView extends RecyclerView {
     }
 
     /**
-     * refresh just notifyDataSetChanged
-     */
-    private Runnable mRefreshRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (getAdapter() != null) {
-                getAdapter().notifyDataSetChanged();
-            }
-        }
-    };
-
-    /**
      * reset header
      */
     private Runnable mResetHeaderRunnable = new Runnable() {
         @Override
         public void run() {
-            mShowHeader = false;
             updateViewParams();
-            final RefreshEdge headerEdge = mHeaderEdge;
-            final int childCount = getChildCount();
-            final int firstTop = childCount == 0
-                    ? mFirstTop : getChildAt(0).getTop();
-            final int topOffset = firstTop - headerEdge.getHeight();
-            final boolean isOutOfTop = mFirstPosition == 0 && topOffset > 0;
-            int state = headerEdge.getState();
-            if (topOffset == 0
-                    && state == RefreshEdge.STATE_REST && mTouchMode == TOUCH_MODE_REST) {
-                if (mFlingRunnable != null) {
-                    mFlingRunnable.scrollToAdjustViewsUpOrDown();
-                }
-            } else if (topOffset > 0
-                    && state == RefreshEdge.STATE_PULL && mTouchMode == TOUCH_MODE_RESCROLL) {
-                if (mFlingRunnable != null) {
-                    mFlingRunnable.scrollToAdjustViewsUpOrDown();
-                    headerEdge.onStateChanged(RefreshEdge.STATE_REST);
-                }
-            } else if (!isOutOfTop
-                    && (state == RefreshEdge.STATE_SUCCESS || state == RefreshEdge.STATE_FAIL)) {
-                if (mFlingRunnable != null && mTouchMode != TOUCH_MODE_SCROLL) {
-                    mFlingRunnable.scrollToAdjustViewsUpOrDown();
-                    headerEdge.onStateChanged(RefreshEdge.STATE_REST);
-                }
+            mShowHeader = false;
+            final int firstPosition = mFirstPosition;
+            final int topOffset = mFirstTop;
+            final boolean isOutOfTop = firstPosition == 0 && topOffset > 0;
+            if (isOutOfTop && mFlingRunnable != null) {
+                mFlingRunnable.scrollToAdjustViewsUpOrDown();
             }
-            final int duration = (int) Math.abs(headerEdge.getHeight() / mDensity) + 50;
-            postDelayed(mRefreshRunnable, duration);
+            mHeaderEdge.onStateChanged(RefreshEdge.STATE_REST);
+            if (getAdapter() != null) {
+                mNotifyDataChanged = true;
+                getAdapter().notifyDataSetChanged();
+            }
         }
     };
 
@@ -154,12 +129,12 @@ public class RefreshRecyclerView extends RecyclerView {
             mShowFooter = false;
             updateViewParams();
             final RefreshEdge footerEdge = mFooterEdge;
-            final int childCount = getChildCount();
+            final int firstPosition = mFirstPosition;
+            final int firstTop = mFirstTop;
             final int lastBottom = mLastBottom;
             final int itemCount = mItemCount;
-            final int firstTop = mFirstTop;
             final int height = getHeight();
-            final int firstPosition = mFirstPosition;
+            final int childCount = getChildCount();
             final boolean isTooShort = childCount == itemCount && lastBottom - firstTop < height;
             final int bottomOffset = isTooShort ? firstTop : lastBottom - height;
             final boolean isOutOfBottom = !isTooShort && firstPosition + childCount == mItemCount && bottomOffset < 0;
@@ -213,12 +188,14 @@ public class RefreshRecyclerView extends RecyclerView {
         mMinimumVelocity = configuration.getScaledMinimumFlingVelocity();
         mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
 
-        setHeaderEdge(new DefaultHeaderEdge(getContext()));
+        mNotifyDataChanged = false;
+        setHeaderEdge(new DefaultRefreshEdge(getContext(), true));
         setAllowRefresh(true);
         mHeaderEdge.onStateChanged(RefreshEdge.STATE_REST);
 
-        setFooterEdge(new DefaultFooterEdge(getContext()));
+        setFooterEdge(new DefaultRefreshEdge(getContext(), false));
         setAllowLoadMore(true);
+        setAutoLoadMore(true);
         mFooterEdge.onStateChanged(RefreshEdge.STATE_REST);
 
         setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
@@ -299,7 +276,6 @@ public class RefreshRecyclerView extends RecyclerView {
             mRefreshing = false;
             headerEdge.onStateChanged(state);
             removeCallbacks(mResetHeaderRunnable);
-            removeCallbacks(mRefreshRunnable);
             postDelayed(mResetHeaderRunnable, 360);
         }
     }
@@ -313,10 +289,17 @@ public class RefreshRecyclerView extends RecyclerView {
         final RefreshEdge footerEdge = mFooterEdge;
         if (footerEdge != null && footerEdge.getState() == RefreshEdge.STATE_LOADING) {
             footerEdge.onStateChanged(state);
-            Log.i("foot_state", "8 - RefreshEdge.STATE_SUCCESS");
             removeCallbacks(mResetFooterRunnable);
             postDelayed(mResetFooterRunnable, 300);
         }
+    }
+
+    /**
+     * set auto loading more, default is true
+     * @param auto auto
+     */
+    public void setAutoLoadMore(boolean auto) {
+        mAutoLoadMore = auto;
     }
 
     /**
@@ -369,10 +352,12 @@ public class RefreshRecyclerView extends RecyclerView {
         mFirstTop = 0;
         mShowFooter = false;
         mShowHeader = false;
+        mNotifyDataChanged = false;
     }
 
     @Override
     public void requestLayout() {
+        //fixed: refresh done or loadmore done, notifydatasetchanged will release too early
         if ((mHeaderEdge != null && mShowHeader
                 && mAllowRefresh && mHeaderEdge.getState() == RefreshEdge.STATE_LOADING)
             || (mFooterEdge != null && mShowFooter
@@ -698,7 +683,7 @@ public class RefreshRecyclerView extends RecyclerView {
             case TOUCH_MODE_DONE_WAITING:
                 mTouchMode = TOUCH_MODE_REST;
                 break;
-            case TOUCH_MODE_SCROLL:
+            case TOUCH_MODE_SCROLL: {
                 if (mFlingRunnable == null) {
                     mFlingRunnable = new FlingRunnable();
                 }
@@ -721,7 +706,7 @@ public class RefreshRecyclerView extends RecyclerView {
                         }
                     }
                 }
-                break;
+            } break;
         }
         invalidate();
         recycleVelocityTracker();
@@ -729,35 +714,40 @@ public class RefreshRecyclerView extends RecyclerView {
     }
 
     private void onTouchCancel() {
-        if (mTouchMode == TOUCH_MODE_SCROLL) {
-            if (mFlingRunnable == null) {
-                mFlingRunnable = new FlingRunnable();
-            }
-            if (!mFlingRunnable.scrollToAdjustViewsUpOrDown()) {
-                int initialVelocity = 0;
-                final VelocityTracker velocityTracker = mVelocityTracker;
-                if (velocityTracker != null) {
-                    velocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
-                    initialVelocity = (int) velocityTracker.getYVelocity(mActivePointerId);
-                }
-                if (Math.abs(initialVelocity) > mMinimumVelocity) {
-                    if (mFlingRunnable == null) {
-                        mFlingRunnable = new FlingRunnable();
-                    }
-                    mFlingRunnable.startScroll(-initialVelocity);
-                } else {
-                    mTouchMode = TOUCH_MODE_REST;
-                    if (mFlingRunnable != null) {
-                        mFlingRunnable.endFling();
-                    }
-                }
-            }
-        } else {
-            mTouchMode = TOUCH_MODE_REST;
-            recycleVelocityTracker();
-            invalidate();
-            mActivePointerId = INVALID;
+        mTouchMode = TOUCH_MODE_REST;
+        invalidate();
+        recycleVelocityTracker();
+        if (mFlingRunnable == null) {
+            mFlingRunnable = new FlingRunnable();
         }
+        mFlingRunnable.scrollToAdjustViewsUpOrDown();
+        mActivePointerId = INVALID;
+    }
+
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        if ((event.getSource() & InputDevice.SOURCE_CLASS_POINTER) != 0) {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_SCROLL: {
+                    if (mTouchMode == TOUCH_MODE_REST) {
+                        final float vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+                        if (vscroll != 0 && !trackMotionScroll((int) vscroll)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return super.onGenericMotionEvent(event);
+    }
+
+    @Override
+    public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
+        if (disallowIntercept) {
+            recycleVelocityTracker();
+        }
+        super.requestDisallowInterceptTouchEvent(disallowIntercept);
     }
 
     private void initOrResetVelocityTracker() {
@@ -796,6 +786,7 @@ public class RefreshRecyclerView extends RecyclerView {
         } else {
             incrementalDeltaY = Math.min(height - 1, incrementalDeltaY);
         }
+
         final RefreshEdge headerEdge = mHeaderEdge;
         final RefreshEdge footerEdge = mFooterEdge;
         final boolean isTooShort = childCount == mItemCount && lastBottom - firstTop < getHeight();
@@ -841,7 +832,6 @@ public class RefreshRecyclerView extends RecyclerView {
                     switch (state) {
                         case RefreshEdge.STATE_PULL:
                             footerEdge.onStateChanged(RefreshEdge.STATE_RELEASE);
-                            Log.i("foot_state", "4 - RefreshEdge.STATE_RELEASE");
                             break;
                     }
                 } else {
@@ -849,7 +839,6 @@ public class RefreshRecyclerView extends RecyclerView {
                         case RefreshEdge.STATE_REST:
                         case RefreshEdge.STATE_RELEASE:
                             footerEdge.onStateChanged(RefreshEdge.STATE_PULL);
-                            Log.i("foot_state", "5 - RefreshEdge.STATE_PULL");
                             break;
                     }
                 }
@@ -886,12 +875,12 @@ public class RefreshRecyclerView extends RecyclerView {
             }
             if (footerEdge != null && footerEdge.getState() == RefreshEdge.STATE_PULL) {
                 footerEdge.onStateChanged(RefreshEdge.STATE_REST);
-                Log.i("foot_state", "6 - RefreshEdge.STATE_REST");
             }
         }
         mBlockLayoutRequests = true;
         invalidate();
         updateViewParams();
+
         offsetChildrenTopAndBottom(incrementalDeltaY);
         updateViewParams();
         mBlockLayoutRequests = false;
@@ -945,7 +934,7 @@ public class RefreshRecyclerView extends RecyclerView {
             if (!mScroller.isFinished()) {
                 mScroller.abortAnimation();
             }
-            int initialY = distance < 0 ? Integer.MAX_VALUE : 0;
+            final int initialY = distance < 0 ? Integer.MAX_VALUE : 0;
             mLastFlingY = initialY;
             mScroller.startScroll(0, initialY, 0, distance, duration);
             mTouchMode = TOUCH_MODE_FLING;
@@ -956,7 +945,7 @@ public class RefreshRecyclerView extends RecyclerView {
             if (!mScroller.isFinished()) {
                 mScroller.abortAnimation();
             }
-            int initialY = initialVelocity < 0 ? Integer.MAX_VALUE : 0;
+            final int initialY = initialVelocity < 0 ? Integer.MAX_VALUE : 0;
             mLastFlingY = initialY;
             mScroller.fling(0, initialY, 0, initialVelocity, 0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE);
             mTouchMode = TOUCH_MODE_FLING;
@@ -964,20 +953,20 @@ public class RefreshRecyclerView extends RecyclerView {
         }
 
         public void endFling() {
-            int oldTouchMode = mTouchMode;
+            final int oldTouchMode = mTouchMode;
             mTouchMode = TOUCH_MODE_REST;
             removeCallbacks(this);
             mScroller.abortAnimation();
 
-            if (mHeaderEdge != null && oldTouchMode == TOUCH_MODE_RESCROLL
-                    && mHeaderEdge.getState() == RefreshEdge.STATE_RELEASE) {
+            if (oldTouchMode == TOUCH_MODE_FLING
+                    || (mHeaderEdge != null && oldTouchMode == TOUCH_MODE_RESCROLL
+                    && mHeaderEdge.getState() == RefreshEdge.STATE_RELEASE)) {
                 scrollToAdjustViewsUpOrDown();
             }
         }
 
         public boolean scrollToAdjustViewsUpOrDown() {
             updateViewParams();
-
             final int firstPosition = mFirstPosition;
             final int lastPosition = mLastPosition;
             final int itemCount = mItemCount;
@@ -1024,7 +1013,6 @@ public class RefreshRecyclerView extends RecyclerView {
                         }
                         if (!isOnLoading && (state == RefreshEdge.STATE_RELEASE || state == RefreshEdge.STATE_REST)) {
                             footerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
-                            Log.i("foot_state", "7 - RefreshEdge.STATE_LOADING");
 
                             removeCallbacks(mLoadMoreRunnable);
                             postDelayed(mLoadMoreRunnable, (long) Math.abs(distance / mDensity) + 300);
@@ -1035,7 +1023,6 @@ public class RefreshRecyclerView extends RecyclerView {
                         } else if (state == RefreshEdge.STATE_RELEASE) {
                             distance += footerEdge.getHeight();
                             footerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
-                            Log.i("foot_state", "8 - RefreshEdge.STATE_LOADING");
 
                             removeCallbacks(mLoadMoreRunnable);
                             postDelayed(mLoadMoreRunnable, (long) Math.abs(distance / mDensity) + 300);
@@ -1053,14 +1040,11 @@ public class RefreshRecyclerView extends RecyclerView {
             } else {
                 return false;
             }
-            updateViewParams();
             return true;
         }
 
         @Override
         public void run() {
-            updateViewParams();
-
             switch (mTouchMode) {
                 default:
                     endFling();
@@ -1072,7 +1056,7 @@ public class RefreshRecyclerView extends RecyclerView {
                 case TOUCH_MODE_RESCROLL:
                 case TOUCH_MODE_FLING: {
                     final Scroller scroller = mScroller;
-                    boolean more = scroller.computeScrollOffset();
+                    final boolean more = scroller.computeScrollOffset();
                     final int y = scroller.getCurrY();
                     int delta = mLastFlingY - y;
                     if (delta > 0) {
@@ -1080,14 +1064,26 @@ public class RefreshRecyclerView extends RecyclerView {
                     } else {
                         delta = Math.max(-(getHeight() - 1), delta);
                     }
-                    final boolean atEdge = trackMotionScroll(delta);
-                    final boolean atEnd = atEdge && (delta != 0);
-                    final int touchMode = mTouchMode;
+
+                    //fixed: after refreshing done and adapter notifyDataSetChanged, can't resume normal status
+                    updateViewParams();
+                    final int firstTop = mFirstTop;
+                    if (mNotifyDataChanged && firstTop == 0 && delta < 0) {
+                        offsetChildrenTopAndBottom(0);
+                        invalidate();
+                        mNotifyDataChanged = false;
+                        endFling();
+                        break;
+                    }
+
+                    boolean atEnd;
+                    if (delta == 0) {
+                        atEnd = true;
+                    } else {
+                        atEnd = trackMotionScroll(delta);
+                    }
                     if (atEnd) {
                         endFling();
-                        if (touchMode == TOUCH_MODE_FLING) {
-                            scrollToAdjustViewsUpOrDown();
-                        }
                         break;
                     }
                     if (more) {
@@ -1095,9 +1091,6 @@ public class RefreshRecyclerView extends RecyclerView {
                         ViewCompat.postOnAnimation(RefreshRecyclerView.this, this);
                     } else {
                         endFling();
-                        if (touchMode == TOUCH_MODE_FLING) {
-                            scrollToAdjustViewsUpOrDown();
-                        }
                     }
                     break;
                 }
