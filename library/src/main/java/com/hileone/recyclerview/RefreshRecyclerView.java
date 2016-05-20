@@ -12,7 +12,6 @@ import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
@@ -829,11 +828,6 @@ public class RefreshRecyclerView extends RecyclerView {
             if (isOutOfBottom && footerEdge != null) {
                 incrementalDeltaY /= DRAG_RATE;
                 final int state = footerEdge.getState();
-
-                Log.i("is_always_execute",
-                        "isOutOfBottom: " + isOutOfBottom
-                        + " offset: " + (bottomOffset <= -footerEdge.getHeight())
-                        + " curState: " + state);
 
                 if (bottomOffset <= -footerEdge.getHeight()) {
                     switch (state) {
