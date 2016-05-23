@@ -303,6 +303,14 @@ public class RefreshRecyclerView extends RecyclerView {
     }
 
     /**
+     * judge pull to refreshing
+     * @return boolean
+     */
+    public boolean isRefreshing() {
+        return mRefreshing;
+    }
+
+    /**
      * set this auto refreshing
      */
     public void performRefresh() {
@@ -533,6 +541,7 @@ public class RefreshRecyclerView extends RecyclerView {
                 if (parent != null) {
                     parent.requestDisallowInterceptTouchEvent(true);
                 }
+                mMotionCorrection = deltaY > 0 ? mTouchSlop : -mTouchSlop;
                 mTouchMode = TOUCH_MODE_SCROLL;
                 scrollIfNeeded(x, y);
                 return true;
@@ -545,7 +554,6 @@ public class RefreshRecyclerView extends RecyclerView {
 
     private void scrollIfNeeded(int x, int y) {
         final int rawDeltaY = y - mInitialDownY;
-        mMotionCorrection = rawDeltaY > 0 ? mTouchSlop : -mTouchSlop;
         final int deltaY = rawDeltaY - mMotionCorrection;
         int incrementalDeltaY = mLastMotionY != Integer.MIN_VALUE ? y - mLastMotionY : deltaY;
         if (mTouchMode == TOUCH_MODE_SCROLL && y != mLastMotionY) {
@@ -796,8 +804,11 @@ public class RefreshRecyclerView extends RecyclerView {
         final boolean isOutOfBottom = !isTooShort && lastPosition == itemCount -1;
         final boolean cannotScrollDown = isOutOfTop && incrementalDeltaY > 0;
         final boolean cannotScrollUp = isOutOfBottom && incrementalDeltaY <= 0;
-        if (isTooShort && cannotScrollDown && mTouchMode == TOUCH_MODE_RESCROLL) {
-            mTouchMode = TOUCH_MODE_FLING;
+
+        //fixed: if list is too short, just let view can't overscroll top
+        if (isTooShort && firstPosition == 0 && !isOutOfTop
+                && incrementalDeltaY < 0 && mTouchMode == TOUCH_MODE_SCROLL) {
+            mTouchMode = TOUCH_MODE_REST;
             return true;
         }
 
@@ -997,7 +1008,7 @@ public class RefreshRecyclerView extends RecyclerView {
                 } else if (headerEdge != null && mShowHeader) {
                     duration += headerEdge.getHeight();
                 }
-                startScroll(-duration, (int) Math.abs(duration / mDensity) + 50);
+                startScroll(-duration, (int) Math.abs(duration / mDensity) + 200);
                 mTouchMode = TOUCH_MODE_RESCROLL;
             } else if (cannotScrollUp) {
                 int duration = bottomOffset;
@@ -1012,7 +1023,7 @@ public class RefreshRecyclerView extends RecyclerView {
                 } else if (footerEdge != null && mShowFooter) {
                     duration += footerEdge.getHeight();
                 }
-                startScroll(duration, (int) Math.abs(duration / mDensity) + 50);
+                startScroll(duration, (int) Math.abs(duration / mDensity) + 200);
                 mTouchMode = TOUCH_MODE_RESCROLL;
             } else {
                 return false;
