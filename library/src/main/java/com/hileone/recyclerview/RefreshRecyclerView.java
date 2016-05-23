@@ -53,6 +53,7 @@ public class RefreshRecyclerView extends RecyclerView {
     private int mLastBottom = 0;
     private int mLastPosition = 0;
     private boolean mAutoLoadMore;
+    private boolean mAutoRefresh;
 
     private int mTouchSlop;
     protected float mDensity = 0;
@@ -191,11 +192,12 @@ public class RefreshRecyclerView extends RecyclerView {
         mNotifyDataChanged = false;
         setHeaderEdge(new DefaultRefreshEdge(getContext(), true));
         setAllowRefresh(true);
+        setAutoRefresh(false);
         mHeaderEdge.onStateChanged(RefreshEdge.STATE_REST);
 
         setFooterEdge(new DefaultRefreshEdge(getContext(), false));
         setAllowLoadMore(true);
-        setAutoLoadMore(true);
+        setAutoLoadMore(false);
         mFooterEdge.onStateChanged(RefreshEdge.STATE_REST);
 
         setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
@@ -231,6 +233,14 @@ public class RefreshRecyclerView extends RecyclerView {
      */
     public void setAllowLoadMore(boolean allowLoadMore) {
         mAllowLoadMore = allowLoadMore;
+    }
+
+    /**
+     * init to set allowed pull to refresh
+     * @param autoRefresh {@link Boolean}
+     */
+    public void setAutoRefresh(boolean autoRefresh) {
+        mAutoRefresh = autoRefresh;
     }
 
     /**
@@ -442,7 +452,7 @@ public class RefreshRecyclerView extends RecyclerView {
             final int firstTop = mFirstTop;
             final int childCount = getChildCount();
             final boolean isTooShort = childCount == mItemCount && lastBottom - firstTop < getHeight();
-            return lastPosition == itemCount - 1 && lastBottom <= getHeight() && !isTooShort;
+            return lastPosition == itemCount - 1 && lastBottom < getHeight() && !isTooShort;
         }
         return false;
     }
@@ -812,51 +822,58 @@ public class RefreshRecyclerView extends RecyclerView {
             return true;
         }
 
-        if (mTouchMode == TOUCH_MODE_SCROLL) {
-            if (isOutOfTop && headerEdge != null) {
+        if (isOutOfTop && headerEdge != null) {
+            if (mTouchMode == TOUCH_MODE_SCROLL) {
                 incrementalDeltaY /= DRAG_RATE;
-                final int state = headerEdge.getState();
-                if (topOffset >= headerEdge.getHeight()) {
-                    switch (state) {
-                        case RefreshEdge.STATE_PULL:
-                        case RefreshEdge.STATE_SUCCESS:
-                        case RefreshEdge.STATE_FAIL:
-                            headerEdge.onStateChanged(RefreshEdge.STATE_RELEASE);
-                            break;
-                    }
-                } else {
-                    switch (state) {
-                        case RefreshEdge.STATE_REST:
-                        case RefreshEdge.STATE_RELEASE:
-                        case RefreshEdge.STATE_SUCCESS:
-                        case RefreshEdge.STATE_FAIL:
-                            headerEdge.onStateChanged(RefreshEdge.STATE_PULL);
-                            break;
-                    }
-                }
             }
 
-            if (isOutOfBottom && footerEdge != null) {
-                incrementalDeltaY /= DRAG_RATE;
-                final int state = footerEdge.getState();
+            final int state = headerEdge.getState();
+            if (topOffset >= headerEdge.getHeight()) {
+                switch (state) {
+                    case RefreshEdge.STATE_PULL:
+                    case RefreshEdge.STATE_SUCCESS:
+                    case RefreshEdge.STATE_FAIL:
+                        if (mTouchMode == TOUCH_MODE_SCROLL) {
+                            headerEdge.onStateChanged(RefreshEdge.STATE_RELEASE);
+                        }
+                        break;
+                }
+            } else {
+                switch (state) {
+                    case RefreshEdge.STATE_REST:
+                    case RefreshEdge.STATE_RELEASE:
+                    case RefreshEdge.STATE_SUCCESS:
+                    case RefreshEdge.STATE_FAIL:
+                        headerEdge.onStateChanged(RefreshEdge.STATE_PULL);
+                        break;
+                }
+            }
+        }
 
-                if (bottomOffset <= -footerEdge.getHeight()) {
-                    switch (state) {
-                        case RefreshEdge.STATE_PULL:
-                        case RefreshEdge.STATE_SUCCESS:
-                        case RefreshEdge.STATE_FAIL:
+        if (isOutOfBottom && footerEdge != null) {
+            if (mTouchMode == TOUCH_MODE_SCROLL) {
+                incrementalDeltaY /= DRAG_RATE;
+            }
+
+            final int state = footerEdge.getState();
+            if (bottomOffset <= -footerEdge.getHeight()) {
+                switch (state) {
+                    case RefreshEdge.STATE_PULL:
+                    case RefreshEdge.STATE_SUCCESS:
+                    case RefreshEdge.STATE_FAIL:
+                        if (mTouchMode == TOUCH_MODE_SCROLL) {
                             footerEdge.onStateChanged(RefreshEdge.STATE_RELEASE);
-                            break;
-                    }
-                } else {
-                    switch (state) {
-                        case RefreshEdge.STATE_REST:
-                        case RefreshEdge.STATE_RELEASE:
-                        case RefreshEdge.STATE_SUCCESS:
-                        case RefreshEdge.STATE_FAIL:
-                            footerEdge.onStateChanged(RefreshEdge.STATE_PULL);
-                            break;
-                    }
+                        }
+                        break;
+                }
+            } else {
+                switch (state) {
+                    case RefreshEdge.STATE_REST:
+                    case RefreshEdge.STATE_RELEASE:
+                    case RefreshEdge.STATE_SUCCESS:
+                    case RefreshEdge.STATE_FAIL:
+                        footerEdge.onStateChanged(RefreshEdge.STATE_PULL);
+                        break;
                 }
             }
         }
@@ -996,32 +1013,29 @@ public class RefreshRecyclerView extends RecyclerView {
 
             if (cannotScrollDown) {
                 int duration = -firstTop;
-                if (headerEdge != null && mAllowRefresh && mRefreshListener != null
-                        && headerEdge.getState() == RefreshEdge.STATE_RELEASE) {
-                    if (!isOnRefreshing) {
-                        mRefreshing = true;
-                        mShowHeader = true;
-                        headerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
-                        mRefreshListener.onRefresh();
+                if (headerEdge != null && mAllowRefresh && mRefreshListener != null) {
+                    if (mAutoRefresh || headerEdge.getState() == RefreshEdge.STATE_RELEASE) {
+                        if (!isOnRefreshing) {
+                            mRefreshing = true;
+                            mShowHeader = true;
+                            headerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
+                            mRefreshListener.onRefresh();
+                        }
+                        duration += headerEdge.getHeight();
                     }
-                    duration += headerEdge.getHeight();
-                } else if (headerEdge != null && mShowHeader) {
-                    duration += headerEdge.getHeight();
                 }
                 startScroll(-duration, (int) Math.abs(duration / mDensity) + 200);
                 mTouchMode = TOUCH_MODE_RESCROLL;
             } else if (cannotScrollUp) {
                 int duration = bottomOffset;
-                if (mAllowLoadMore && footerEdge != null && mLoadMoreListener != null && !isTooShort) {
-                    if (!isOnLoading &&
-                            (mAutoLoadMore || footerEdge.getState() == RefreshEdge.STATE_RELEASE)) {
+                if (mAllowLoadMore && footerEdge != null && mLoadMoreListener != null
+                        && !isTooShort && !isOnLoading) {
+                    if (mAutoLoadMore || footerEdge.getState() == RefreshEdge.STATE_RELEASE) {
                         mShowFooter = true;
                         footerEdge.onStateChanged(RefreshEdge.STATE_LOADING);
                         mLoadMoreListener.onLoadMore();
+                        duration += footerEdge.getHeight();
                     }
-                    duration += footerEdge.getHeight();
-                } else if (footerEdge != null && mShowFooter) {
-                    duration += footerEdge.getHeight();
                 }
                 startScroll(duration, (int) Math.abs(duration / mDensity) + 200);
                 mTouchMode = TOUCH_MODE_RESCROLL;
