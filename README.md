@@ -12,6 +12,8 @@ RefreshRecyclerView has eight states and RefreshEdge (HeaderEdge or FooterEdge) 
 Achieved through converting the above respective states such as pull-to-refresh、drag-to-loadmore、overscroll and other effects.
 Innovation is that by extending the RecyclerView and using drawing canvas to  acheive above effect. Need to do is extended the RefreshEdge to inherit the customized Header or Footer.  
 
+## Code
+[RefreshRecyclerView.java](./library/src/main/java/com/hileone/recyclerview/RefreshRecyclerView.java)
 
 License
 =======
