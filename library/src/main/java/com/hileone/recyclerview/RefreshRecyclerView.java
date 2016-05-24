@@ -1,10 +1,8 @@
 package com.hileone.recyclerview;
 
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Rect;
-import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.view.MotionEventCompat;
@@ -12,7 +10,6 @@ import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
-import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -464,7 +461,7 @@ public class RefreshRecyclerView extends RecyclerView {
         }
 
         if (!mAllowRefresh && !mAllowLoadMore) {
-            return false;
+            return super.onInterceptTouchEvent(ev);
         }
 
         updateViewParams();
@@ -485,8 +482,7 @@ public class RefreshRecyclerView extends RecyclerView {
                 if (touchMode == TOUCH_MODE_FLING || touchMode == TOUCH_MODE_RESCROLL) {
                     return true;
                 }
-                break;
-            }
+            } break;
 
             case MotionEvent.ACTION_MOVE: {
                 if (mTouchMode == TOUCH_MODE_INVALID) {
@@ -503,8 +499,7 @@ public class RefreshRecyclerView extends RecyclerView {
                         mVelocityTracker.addMovement(ev);
                         break;
                 }
-                break;
-            }
+            } break;
 
             case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_UP: {
@@ -589,7 +584,7 @@ public class RefreshRecyclerView extends RecyclerView {
         }
 
         if (!mAllowRefresh && !mAllowLoadMore) {
-            return false;
+            return super.onTouchEvent(ev);
         }
 
         updateViewParams();
@@ -742,31 +737,23 @@ public class RefreshRecyclerView extends RecyclerView {
         mActivePointerId = INVALID;
     }
 
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
-    @Override
-    public boolean onGenericMotionEvent(MotionEvent event) {
-        if ((event.getSource() & InputDevice.SOURCE_CLASS_POINTER) != 0) {
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_SCROLL: {
-                    if (mTouchMode == TOUCH_MODE_REST) {
-                        final float vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
-                        if (vscroll != 0 && !trackMotionScroll((int) vscroll)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return super.onGenericMotionEvent(event);
-    }
-
-    @Override
-    public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
-        if (disallowIntercept) {
-            recycleVelocityTracker();
-        }
-        super.requestDisallowInterceptTouchEvent(disallowIntercept);
-    }
+//    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
+//    @Override
+//    public boolean onGenericMotionEvent(MotionEvent event) {
+//        if ((event.getSource() & InputDevice.SOURCE_CLASS_POINTER) != 0) {
+//            switch (event.getAction()) {
+//                case MotionEvent.ACTION_SCROLL: {
+//                    if (mTouchMode == TOUCH_MODE_REST) {
+//                        final float vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+//                        if (vscroll != 0 && !trackMotionScroll((int) vscroll)) {
+//                            return true;
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//        return super.onGenericMotionEvent(event);
+//    }
 
     private void initOrResetVelocityTracker() {
         if (mVelocityTracker == null) {
@@ -816,10 +803,13 @@ public class RefreshRecyclerView extends RecyclerView {
         final boolean cannotScrollUp = isOutOfBottom && incrementalDeltaY <= 0;
 
         //fixed: if list is too short, just let view can't overscroll top
-        if (isTooShort && firstPosition == 0 && !isOutOfTop
+        if ((isTooShort || !mAllowLoadMore) && !isOutOfTop && lastPosition >= (itemCount - 1)
                 && incrementalDeltaY < 0 && mTouchMode == TOUCH_MODE_SCROLL) {
             mTouchMode = TOUCH_MODE_REST;
-            return true;
+            if (footerEdge != null && footerEdge.getState() == RefreshEdge.STATE_PULL) {
+                footerEdge.onStateChanged(RefreshEdge.STATE_REST);
+            }
+            return false;
         }
 
         if (isOutOfTop && headerEdge != null) {
@@ -906,8 +896,13 @@ public class RefreshRecyclerView extends RecyclerView {
             if (headerEdge != null && headerEdge.getState() == RefreshEdge.STATE_PULL) {
                 headerEdge.onStateChanged(RefreshEdge.STATE_REST);
             }
+
             if (footerEdge != null && footerEdge.getState() == RefreshEdge.STATE_PULL) {
                 footerEdge.onStateChanged(RefreshEdge.STATE_REST);
+            }
+
+            if (firstPosition > 0 && lastPosition < itemCount - 1) {
+                return false;
             }
         }
         mBlockLayoutRequests = true;

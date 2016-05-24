@@ -2,9 +2,33 @@
 <RelativeLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:gravity="center">
 
+    <Button
+        android:id="@+id/one"
+        android:layout_width="match_parent"
+        android:layout_height="66dp"
+        android:layout_margin="20dp"
+        android:textAllCaps="false"
+        android:text="Test All Condition in ViewPager"/>
 
+    <Button
+        android:id="@+id/two"
+        android:layout_width="match_parent"
+        android:layout_height="66dp"
+        android:layout_margin="20dp"
+        android:layout_below="@id/one"
+        android:textAllCaps="false"
+        android:text="Zrc Effect Display"/>
 
+    <Button
+        android:id="@+id/three"
+        android:layout_width="match_parent"
+        android:layout_height="66dp"
+        android:layout_margin="20dp"
+        android:layout_below="@id/two"
+        android:textAllCaps="false"
+        android:text="New Effect Display"/>
 
 </RelativeLayout>

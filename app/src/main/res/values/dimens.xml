@@ -7,4 +7,13 @@
     <dimen name="refresh_header_height">80dp</dimen>
     <dimen name="refresh_footer_height">80dp</dimen>
 
+    <dimen name="bitmap_padding_top">5dp</dimen>
+    <dimen name="text_padding_top">5dp</dimen>
+    <dimen name="text_padding_bottom">7dp</dimen>
+
+    <dimen name="show_text_size">16sp</dimen>
+    <dimen name="header_edge_height">60dp</dimen>
+    <dimen name="footer_edge_height">40dp</dimen>
+    <dimen name="point_radius">2.5dp</dimen>
+
 </resources>

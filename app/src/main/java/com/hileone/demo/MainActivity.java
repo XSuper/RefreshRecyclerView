@@ -1,14 +1,13 @@
 package com.hileone.demo;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.RecyclerView;
-import android.view.ViewGroup;
+import android.view.View;
 
-import com.hileone.recyclerview.RefreshRecyclerView;
-
-import java.util.ArrayList;
-import java.util.Random;
+import com.hileone.demo.new_refresh.NewRefreshActivity;
+import com.hileone.demo.all_condition.AllConditionActivity;
+import com.hileone.demo.zrc_refresh.ZrcRefreshActivity;
 
 /**
  * The creator is Leone && E-mail: butleone@163.com
@@ -17,82 +16,30 @@ import java.util.Random;
  * @date 5/12/16
  * @description Edit it! Change it! Beat it! Whatever, just do it!
  */
-public class MainActivity extends AppCompatActivity
-        implements RefreshRecyclerView.OnRefreshListener, RefreshRecyclerView.OnLoadMoreListener {
-
-    private RefreshRecyclerView recyclerView;
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        recyclerView = new RefreshRecyclerView(this);
-        setContentView(recyclerView);
-        recyclerView.setRefreshListener(this);
-        recyclerView.setLoadMoreListener(this);
+        setContentView(R.layout.activity_main);
 
-        recyclerView.setLayoutManager();
-        BaseAdapter adapter = new BaseAdapter();
-        recyclerView.setAdapter(adapter);
-        adapter.initData();
+        findViewById(R.id.one).setOnClickListener(this);
+        findViewById(R.id.two).setOnClickListener(this);
+        findViewById(R.id.three).setOnClickListener(this);
     }
 
     @Override
-    public void onLoadMore() {
-        recyclerView.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                ((BaseAdapter) recyclerView.getAdapter()).addDataAndNotify();
-                recyclerView.setLoadMoreDone(true);
-            }
-        }, 2000);
-    }
-
-    @Override
-    public void onRefresh() {
-        recyclerView.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                ((BaseAdapter) recyclerView.getAdapter()).initData();
-                recyclerView.setRefreshDone(true);
-            }
-        }, 2000);
-    }
-
-    private class BaseAdapter extends RecyclerView.Adapter<DemoViewHolder> {
-
-        private ArrayList<String> data = new ArrayList<>();
-        Random r = new Random();
-
-        public void initData(){
-            data.clear();
-            for(int i = 0; i < 60; i++){
-                data.add(r.nextInt(100) + "");
-            }
-            notifyDataSetChanged();
-        }
-
-        public void addDataAndNotify() {
-            for (int i = 0; i < 6; i++) {
-                data.add(r.nextInt(100) + "");
-            }
-            notifyDataSetChanged();
-        }
-
-        @Override
-        public DemoViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            return new DemoViewHolder(parent.getContext());
-        }
-
-        @Override
-        public void onBindViewHolder(DemoViewHolder holder, int position) {
-            holder.setText("Item" + position + "_" + data.get(position));
-            holder.setOnClick();
-        }
-
-        @Override
-        public int getItemCount() {
-            return data.size();
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.one:
+                startActivity(new Intent(MainActivity.this, AllConditionActivity.class));
+                break;
+            case R.id.two:
+                startActivity(new Intent(MainActivity.this, ZrcRefreshActivity.class));
+                break;
+            case R.id.three:
+                startActivity(new Intent(MainActivity.this, NewRefreshActivity.class));
+                break;
         }
     }
-
 }
