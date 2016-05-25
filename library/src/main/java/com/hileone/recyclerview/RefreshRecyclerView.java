@@ -1,8 +1,10 @@
 package com.hileone.recyclerview;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.view.MotionEventCompat;
@@ -10,6 +12,7 @@ import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
+import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -737,23 +740,23 @@ public class RefreshRecyclerView extends RecyclerView {
         mActivePointerId = INVALID;
     }
 
-//    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
-//    @Override
-//    public boolean onGenericMotionEvent(MotionEvent event) {
-//        if ((event.getSource() & InputDevice.SOURCE_CLASS_POINTER) != 0) {
-//            switch (event.getAction()) {
-//                case MotionEvent.ACTION_SCROLL: {
-//                    if (mTouchMode == TOUCH_MODE_REST) {
-//                        final float vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
-//                        if (vscroll != 0 && !trackMotionScroll((int) vscroll)) {
-//                            return true;
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//        return super.onGenericMotionEvent(event);
-//    }
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+        if ((event.getSource() & InputDevice.SOURCE_CLASS_POINTER) != 0) {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_SCROLL: {
+                    if (mTouchMode == TOUCH_MODE_REST) {
+                        final float vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
+                        if (vscroll != 0 && !trackMotionScroll((int) vscroll)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return super.onGenericMotionEvent(event);
+    }
 
     private void initOrResetVelocityTracker() {
         if (mVelocityTracker == null) {
