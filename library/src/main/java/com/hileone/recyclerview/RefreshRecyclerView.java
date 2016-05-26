@@ -36,11 +36,9 @@ public class RefreshRecyclerView extends RecyclerView {
     private static final int TOUCH_MODE_INVALID = -2;
     private static final int TOUCH_MODE_REST = -1;
     private static final int TOUCH_MODE_DOWN = 0;
-    private static final int TOUCH_MODE_TAP = 1;
-    private static final int TOUCH_MODE_DONE_WAITING = 2;
-    private static final int TOUCH_MODE_SCROLL = 3;
-    private static final int TOUCH_MODE_FLING = 4;
-    private static final int TOUCH_MODE_RESCROLL = 5;
+    private static final int TOUCH_MODE_SCROLL = 1;
+    private static final int TOUCH_MODE_FLING = 2;
+    private static final int TOUCH_MODE_RESCROLL = 3;
 
     private boolean mIsAttached;
     private RefreshEdge mHeaderEdge;
@@ -682,8 +680,6 @@ public class RefreshRecyclerView extends RecyclerView {
         final int y = (int) ev.getY(pointerIndex);
         switch (mTouchMode) {
             case TOUCH_MODE_DOWN:
-            case TOUCH_MODE_TAP:
-            case TOUCH_MODE_DONE_WAITING:
                 startScrollIfNeeded(x, y);
                 break;
             case TOUCH_MODE_SCROLL:
@@ -695,8 +691,6 @@ public class RefreshRecyclerView extends RecyclerView {
     private void onTouchUp(MotionEvent ev) {
         switch (mTouchMode) {
             case TOUCH_MODE_DOWN:
-            case TOUCH_MODE_TAP:
-            case TOUCH_MODE_DONE_WAITING:
                 mTouchMode = TOUCH_MODE_REST;
                 break;
             case TOUCH_MODE_SCROLL: {
